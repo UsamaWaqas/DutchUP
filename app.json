@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "dutchup",
+    "name": "DutchUp",
     "slug": "dutchup",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,15 +11,28 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0C1F5A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.chirptech.dutchup"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#F4F3EE"
+    },
+    "scheme": "dutchup",
+    "backgroundColor": "#F4F3EE",
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
