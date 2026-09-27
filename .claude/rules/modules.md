@@ -40,3 +40,14 @@
 - **Key files**:
   - `supabase/schema.sql`
 - **File count**: 1
+
+## ios
+- **Location**: `ios/`
+- **Purpose**: Project folder
+- **Key files**:
+  - `ios/.gitignore`
+  - `ios/.xcode.env`
+  - `ios/DutchUp.xcodeproj/project.pbxproj`
+  - `ios/DutchUp.xcodeproj/project.xcworkspace/contents.xcworkspacedata`
+  - `ios/DutchUp.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist`
+- **File count**: 22

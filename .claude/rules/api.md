@@ -163,3 +163,23 @@ No route files detected
 
 ## New Routes (added 2026-09-19)
 - `android/app/.cxx/Debug/167603d6/arm64-v8a/.cmake/api/v1/reply/index-2026-09-19T17-22-31-0514.json`
+
+## New Routes (added 2026-09-20)
+- `android/app/.cxx/Debug/167603d6/arm64-v8a/.cmake/api/v1/reply/index-2026-09-20T10-23-46-0125.json`
+
+## New Routes (added 2026-09-20)
+- `android/app/.cxx/RelWithDebInfo/3o596453/arm64-v8a/.cmake/api/v1/reply/index-2026-09-20T14-17-18-0869.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/armeabi-v7a/.cmake/api/v1/reply/index-2026-09-20T14-17-22-0866.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/x86/.cmake/api/v1/reply/index-2026-09-20T14-17-27-0350.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/x86_64/.cmake/api/v1/reply/index-2026-09-20T14-17-32-0201.json`
+
+## New Routes (added 2026-09-20)
+- `android/app/.cxx/Debug/167603d6/arm64-v8a/.cmake/api/v1/reply/cache-v2-3dd1b7e82ff96a68cb3c.json`
+- `android/app/.cxx/Debug/167603d6/arm64-v8a/.cmake/api/v1/reply/cmakeFiles-v1-495ce9e1b2dadee2baa7.json`
+- `android/app/.cxx/Debug/167603d6/arm64-v8a/.cmake/api/v1/reply/index-2026-09-20T17-42-14-0320.json`
+
+## New Routes (added 2026-09-26)
+- `android/app/.cxx/RelWithDebInfo/3o596453/arm64-v8a/.cmake/api/v1/reply/index-2026-09-21T01-28-16-0220.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/armeabi-v7a/.cmake/api/v1/reply/index-2026-09-21T01-28-16-0925.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/x86/.cmake/api/v1/reply/index-2026-09-21T01-28-17-0715.json`
+- `android/app/.cxx/RelWithDebInfo/3o596453/x86_64/.cmake/api/v1/reply/index-2026-09-21T01-28-18-0473.json`

@@ -312,10 +312,11 @@ drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles for update
   using (id = auth.uid()) with check (id = auth.uid());
 
--- groups: members only.
+-- groups: members, plus the creator (who isn't a group_members row yet at the
+-- instant createGroup()'s insert().select() reads back the just-created row).
 drop policy if exists "groups_select" on public.groups;
 create policy "groups_select" on public.groups for select
-  using (public.is_group_member(id, auth.uid()));
+  using (created_by = auth.uid() or public.is_group_member(id, auth.uid()));
 
 drop policy if exists "groups_insert" on public.groups;
 create policy "groups_insert" on public.groups for insert
@@ -334,9 +335,20 @@ drop policy if exists "group_members_select" on public.group_members;
 create policy "group_members_select" on public.group_members for select
   using (public.is_group_member(group_id, auth.uid()));
 
+-- The `exists ... groups` clause matters: createGroup() inserts the creator's
+-- admin row and any invited members in one multi-row statement. Every row's
+-- WITH CHECK runs against the snapshot taken before that statement started, so
+-- is_group_admin() (reading group_members) can't see the creator's own row
+-- being inserted in that same statement. Checking groups.created_by instead
+-- reads a table that was already committed by createGroup()'s prior, separate
+-- `groups` insert, so it's visible regardless of same-statement ordering.
 drop policy if exists "group_members_insert" on public.group_members;
 create policy "group_members_insert" on public.group_members for insert
-  with check (user_id = auth.uid() or public.is_group_admin(group_id, auth.uid()));
+  with check (
+    user_id = auth.uid()
+    or public.is_group_admin(group_id, auth.uid())
+    or exists (select 1 from public.groups g where g.id = group_id and g.created_by = auth.uid())
+  );
 
 drop policy if exists "group_members_update" on public.group_members;
 create policy "group_members_update" on public.group_members for update

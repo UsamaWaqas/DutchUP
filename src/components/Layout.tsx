@@ -3,6 +3,7 @@ import { LayoutChangeEvent, Pressable, ScrollView, StyleProp, View, ViewStyle } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii, TOP_INSET } from '@/theme';
 import { symbolFor } from '@/lib/currencies';
+import { useI18n } from '@/lib/i18n';
 import { Icon } from './Icon';
 import { IconName } from './iconData';
 import { IconButton } from './Controls';
@@ -40,6 +41,75 @@ export function Screen({ children, footer, bg = colors.bg, bottomPad = 0, overla
       {footer}
       {overlay}
     </View>
+  );
+}
+
+/* -------------------------------------------------------------- BottomSheet */
+interface BottomSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  title?: string;
+}
+
+/**
+ * Styled bottom sheet: dim backdrop (tap to dismiss), a grabber handle, and a
+ * surface-colored panel that respects the bottom safe area. Pass via a
+ * <Screen overlay={...}> the same way the rest of the app already renders
+ * floating content, so it composes with whatever screen hosts it.
+ */
+export function BottomSheet({ visible, onClose, children, title }: BottomSheetProps) {
+  const insets = useSafeAreaInsets();
+  if (!visible) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Close"
+      onPress={onClose}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,20,36,0.5)', alignItems: 'center', justifyContent: 'flex-end' }}
+    >
+      <Pressable style={{ width: '100%', backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Math.max(insets.bottom, 24), paddingTop: 10 }}>
+        <View style={{ alignItems: 'center', paddingBottom: 10 }}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.line }} />
+        </View>
+        {title ? (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+            <T size={16} w="bold">
+              {title}
+            </T>
+          </View>
+        ) : null}
+        {children}
+      </Pressable>
+    </Pressable>
+  );
+}
+
+interface SheetActionItem {
+  label: string;
+  icon?: IconName;
+  onPress: () => void;
+  destructive?: boolean;
+}
+
+/** A Card of tappable rows for use inside a BottomSheet — replaces unstyled Alert.alert action lists. */
+export function SheetActions({ items }: { items: SheetActionItem[] }) {
+  return (
+    <Card style={{ marginHorizontal: 20 }}>
+      {items.map((item, i) => (
+        <Pressable
+          key={item.label}
+          accessibilityRole="button"
+          onPress={item.onPress}
+          style={[{ minHeight: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, i > 0 ? rowDivider : null]}
+        >
+          {item.icon ? <Icon name={item.icon} size={20} color={item.destructive ? colors.red : colors.ink} /> : null}
+          <T size={15} w="semibold" color={item.destructive ? colors.red : colors.ink}>
+            {item.label}
+          </T>
+        </Pressable>
+      ))}
+    </Card>
   );
 }
 
@@ -106,7 +176,6 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
           borderColor: 'rgba(58,28,10,0.28)',
           borderRadius: radii.card,
           overflow: 'hidden',
-          boxShadow: 'inset 0 1px 2px rgba(255,236,215,0.6), inset 0 -1px 3px rgba(90,50,15,0.16), 0 8px 16px -8px rgba(70,40,10,0.28)',
         } as ViewStyle,
         style,
       ]}
@@ -152,7 +221,6 @@ export function Hero({ children, motifHeight = 230, padX = 22, padTop = 22, padB
           overflow: 'hidden',
           borderWidth: 1,
           borderColor: 'rgba(0,0,0,0.25)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 14px 26px -10px rgba(20,15,5,0.45)',
         } as ViewStyle,
         style,
       ]}
@@ -219,17 +287,16 @@ export function Tile({ icon, size = 44, dark, onDeep = false }: { icon: IconName
   }
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[base, look]}>
-      {isDark && !onDeep ? <Motif width={size} height={size} anchor="center" base={0.55} cell={28} pos="tl" /> : null}
       <Icon name={icon} size={Math.round(size * 0.44)} color={fg} />
     </View>
   );
 }
 
 /* ----------------------------------------------------------------- Tab bar */
-const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: 'home', label: 'Home', icon: 'home' },
-  { name: 'groups', label: 'Groups', icon: 'users' },
-  { name: 'activity', label: 'Activity', icon: 'bell' },
+const TABS: { name: string; labelKey: string; icon: IconName }[] = [
+  { name: 'home', labelKey: 'tabs.home', icon: 'home' },
+  { name: 'groups', labelKey: 'tabs.groups', icon: 'users' },
+  { name: 'activity', labelKey: 'tabs.activity', icon: 'bell' },
 ];
 
 interface TabBarLikeProps {
@@ -240,28 +307,30 @@ interface TabBarLikeProps {
 /** Custom bottom tab bar (white, hairline top border, orange marker on the active tab). */
 export function TabBar({ state, navigation }: TabBarLikeProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const activeName = state.routes[state.index]?.name;
   return (
     <View
       accessibilityRole="tablist"
       style={{ flexDirection: 'row', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 11, paddingHorizontal: 12, paddingBottom: Math.max(insets.bottom, 24) }}
     >
-      {TABS.map((t) => {
-        const on = t.name === activeName;
+      {TABS.map((tab) => {
+        const on = tab.name === activeName;
         const fg = on ? colors.deep : colors.muted;
+        const label = t(tab.labelKey);
         return (
           <Pressable
-            key={t.name}
+            key={tab.name}
             accessibilityRole="tab"
-            accessibilityLabel={t.label}
+            accessibilityLabel={label}
             accessibilityState={{ selected: on }}
-            onPress={() => navigation.navigate(t.name)}
+            onPress={() => navigation.navigate(tab.name)}
             style={{ flex: 1, height: 54, alignItems: 'center', justifyContent: 'center', gap: 5 }}
           >
             {on ? <View style={{ position: 'absolute', top: -11, width: 28, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: colors.orange }} /> : null}
-            <Icon name={t.icon} size={22} color={fg} strokeWidth={on ? 1.8 : 1.5} />
+            <Icon name={tab.icon} size={22} color={fg} strokeWidth={on ? 1.8 : 1.5} />
             <T size={11.5} w={on ? 'bold' : 'medium'} color={fg} ls={0.04}>
-              {t.label}
+              {label}
             </T>
           </Pressable>
         );

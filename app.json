@@ -7,17 +7,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chirptech.dutchup"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0C1F5A",
+        "backgroundColor": "#4A2A14",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.chirptech.dutchup"
+      "package": "com.chirptech.dutchup",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,7 +33,23 @@
     "backgroundColor": "#F4F3EE",
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4F3EE"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DutchUp needs access to your photos to attach a receipt.",
+          "cameraPermission": "DutchUp needs access to your camera to scan a receipt."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

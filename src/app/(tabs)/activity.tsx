@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { colors } from '@/theme';
 import { ActivityItem, ActivitySection, fetchActivity } from '@/lib/queries';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { Avatar } from '@/components/Avatar';
 import { Icon } from '@/components/Icon';
 import { Card, LargeTitle, Screen, SectionLabel, rowDivider } from '@/components/Layout';
@@ -42,6 +43,7 @@ function Row({ item, first }: { item: ActivityItem; first: boolean }) {
 /** 4 · Activity — feed grouped by day. */
 export default function Activity() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [sections, setSections] = useState<ActivitySection[] | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -67,11 +69,11 @@ export default function Activity() {
   return (
     <Screen bottomPad={20}>
       <View style={{ paddingHorizontal: 20, gap: 12 }}>
-        <LargeTitle title="Activity" />
+        <LargeTitle title={t('activity.title')} />
         {loadError ? (
           <View style={{ paddingTop: 60, alignItems: 'center' }}>
             <T size={14} color={colors.muted}>
-              Couldn't load your activity. Pull to refresh or try again.
+              {t('activity.couldntLoadActivity')}
             </T>
           </View>
         ) : !sections ? (
@@ -81,7 +83,7 @@ export default function Activity() {
         ) : sections.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <T size={14} color={colors.muted}>
-              Nothing yet — activity from your groups will show up here.
+              {t('activity.nothingYet')}
             </T>
           </View>
         ) : (

@@ -33,3 +33,8 @@
 | Command | What it does |
 |---------|-------------|
 | `npm run start:dev-client` | expo start --dev-client |
+
+## New Commands (added 2026-09-20)
+| Command | What it does |
+|---------|-------------|
+| `npm run lint` | expo lint |
