@@ -7,12 +7,14 @@ import { colors, TOP_INSET } from '@/theme';
 import { Button, Field, IconButton } from '@/components/Controls';
 import { T } from '@/components/Text';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 
 /** Create account — same Delft-navy treatment as Welcome. */
 export default function SignUp() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signUp } = useAuth();
+  const { t } = useI18n();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,15 +26,15 @@ export default function SignUp() {
 
   const onCreate = async () => {
     if (!fullName.trim() || !email.trim() || !password) {
-      setError('Fill in your name, email and password.');
+      setError(t('auth.fillNameEmailPassword'));
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.passwordMin6'));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match.");
+      setError(t('auth.passwordsDontMatch'));
       return;
     }
     setError(null);
@@ -51,34 +53,34 @@ export default function SignUp() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <IconButton icon="chevron-left" label="Back" color={colors.ivory} onPress={() => router.back()} />
+        <IconButton icon="chevron-left" label={t('common.back')} color={colors.ivory} onPress={() => router.back()} />
 
         {done ? (
           <View style={{ flex: 1, justifyContent: 'center', gap: 14 }}>
             <T serif size={34} color={colors.ivory}>
-              Check your email
+              {t('auth.checkYourEmail')}
             </T>
             <T size={15} lh={1.55} color={colors.onDeep}>
-              We sent a confirmation link to {email}. Verify it, then log in.
+              {t('auth.confirmationSent', { email })}
             </T>
-            <Button label="Back to log in" kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
+            <Button label={t('auth.backToLogIn')} kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
           </View>
         ) : (
           <>
             <View style={{ marginTop: 24 }}>
               <T serif size={44} lh={1} ls={-0.02} color={colors.ivory} accessibilityRole="header">
-                Create an account
+                {t('auth.createAccount')}
               </T>
             </View>
             <T size={15} lh={1.55} color={colors.onDeep} style={{ marginTop: 12 }}>
-              Track shared expenses with friends, roommates and trips.
+              {t('auth.trackSharedExpenses')}
             </T>
 
             <View style={{ marginTop: 28, gap: 14 }}>
-              <Field dark label="Full name" value={fullName} onChangeText={setFullName} autoCapitalize="words" autoComplete="name" placeholder="Ayesha Khan" />
-              <Field dark label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" placeholder="you@example.com" />
-              <Field dark label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password-new" placeholder="At least 6 characters" />
-              <Field dark label="Confirm password" value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="password-new" placeholder="Re-enter password" />
+              <Field dark label={t('auth.fullName')} value={fullName} onChangeText={setFullName} autoCapitalize="words" autoComplete="name" placeholder="Ayesha Khan" />
+              <Field dark label={t('auth.email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" placeholder="you@example.com" />
+              <Field dark label={t('auth.password')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password-new" placeholder={t('auth.atLeast6Chars')} />
+              <Field dark label={t('auth.confirmPassword')} value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="password-new" placeholder={t('auth.reenterPassword')} />
             </View>
 
             {error ? (
@@ -93,7 +95,7 @@ export default function SignUp() {
                   <ActivityIndicator color={colors.ivory} />
                 </View>
               ) : (
-                <Button label="Create account" kind="ivory" onPress={onCreate} />
+                <Button label={t('auth.createAccount')} kind="ivory" onPress={onCreate} />
               )}
             </View>
           </>

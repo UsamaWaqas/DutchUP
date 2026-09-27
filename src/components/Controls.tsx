@@ -17,6 +17,7 @@ interface ButtonProps {
   /** flex-grow with zero basis, for side-by-side buttons */
   grow?: number;
   height?: number;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -28,12 +29,14 @@ const BUTTON_LOOK: Record<ButtonKind, { bg: string; fg: string; border?: string 
   ghost: { bg: 'transparent', fg: colors.cobalt },
 };
 
-export function Button({ label, kind = 'primary', icon, onPress, grow, height = 54, style }: ButtonProps) {
+export function Button({ label, kind = 'primary', icon, onPress, grow, height = 54, disabled, style }: ButtonProps) {
   const look = BUTTON_LOOK[kind];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         {
@@ -47,7 +50,7 @@ export function Button({ label, kind = 'primary', icon, onPress, grow, height = 
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          opacity: pressed ? 0.85 : 1,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
         },
         grow ? { flexGrow: grow, flexBasis: 0 } : null,
         style,
@@ -110,7 +113,7 @@ export function ChipRow({ children }: { children: React.ReactNode }) {
 }
 
 /* -------------------------------------------------------------------- Tabs */
-export function Tabs<L extends string>({ items, active, onChange }: { items: { label: L; count?: number }[]; active: L; onChange?: (l: L) => void }) {
+export function Tabs<L extends string>({ items, active, onChange }: { items: { label: L; display?: string; count?: number }[]; active: L; onChange?: (l: L) => void }) {
   return (
     <View style={{ flexDirection: 'row', gap: 22, borderBottomWidth: 1, borderBottomColor: colors.line }}>
       {items.map((it) => {
@@ -124,7 +127,7 @@ export function Tabs<L extends string>({ items, active, onChange }: { items: { l
             style={{ height: 44, marginBottom: -1, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on ? colors.deep : 'transparent' }}
           >
             <T size={14} w={on ? 'bold' : 'semibold'} color={on ? colors.ink : colors.muted}>
-              {it.label}
+              {it.display ?? it.label}
             </T>
             {it.count != null ? (
               <T size={12} w="bold" color={colors.muted} style={{ marginLeft: 6 }}>
@@ -139,7 +142,7 @@ export function Tabs<L extends string>({ items, active, onChange }: { items: { l
 }
 
 /* --------------------------------------------------------------- Segmented */
-export function Segmented<L extends string>({ items, active, onChange }: { items: L[]; active: L; onChange?: (l: L) => void }) {
+export function Segmented<L extends string>({ items, active, onChange, labels }: { items: L[]; active: L; onChange?: (l: L) => void; labels?: Partial<Record<L, string>> }) {
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, padding: 4, backgroundColor: colors.track, borderRadius: 13 }}>
       {items.map((l) => {
@@ -153,7 +156,7 @@ export function Segmented<L extends string>({ items, active, onChange }: { items
             style={{ flex: 1, height: 44, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.deep : 'transparent' }}
           >
             <T size={14} w="bold" color={on ? colors.ivory : colors.muted}>
-              {l}
+              {labels?.[l] ?? l}
             </T>
           </Pressable>
         );
@@ -179,6 +182,7 @@ export function Field({ label, dark = false, ...input }: FieldProps) {
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={dark ? colors.onDeep : colors.muted}
+        maxFontSizeMultiplier={1.3}
         {...input}
         style={[
           {
@@ -237,6 +241,7 @@ export function SearchField({ placeholder, height = 50, value, onChangeText, onS
         returnKeyType={onSubmitEditing ? 'done' : undefined}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
+        maxFontSizeMultiplier={1.3}
         style={[{ flex: 1, minWidth: 0, height: height - 4, padding: 0, fontFamily: 'Manrope_500Medium', fontSize: 15, color: colors.ink }, noOutline]}
       />
     </View>

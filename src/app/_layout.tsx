@@ -9,8 +9,13 @@ import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700
 import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
 import { colors } from '@/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { ThemeProvider, useThemeMode } from '@/lib/theme-context';
+import { LanguageProvider } from '@/lib/i18n';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { installGlobalErrorHandler } from '@/lib/globalErrorHandler';
 
 SplashScreen.preventAutoHideAsync();
+installGlobalErrorHandler();
 
 /** Routes reachable while logged out. 'reset-password' also stays put once a recovery
  *  session lands (it manages its own redirect once the new password is saved). */
@@ -49,10 +54,34 @@ function Navigation() {
       <Stack.Screen name="expense" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="settle" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="settings" />
       <Stack.Screen name="new-group" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="add-friend" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="add-expense" options={{ animation: 'slide_from_bottom' }} />
     </Stack>
+  );
+}
+
+function ThemedShell({ remountKey }: { remountKey: number }) {
+  const { scheme } = useThemeMode();
+  return (
+    // Language and auth state must survive a theme toggle, so they live outside the
+    // remount boundary — only the navigator (which reads the mutated `colors` object
+    // directly at render time) needs to be forced to fully remount here.
+    <LanguageProvider>
+      <AuthProvider>
+        <React.Fragment key={remountKey}>
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+          {/* On web the phone layout is centred at a phone-like width. */}
+          <View style={[{ flex: 1, backgroundColor: colors.bg }, Platform.OS === 'web' ? { width: '100%', maxWidth: 480, alignSelf: 'center' } : null]}>
+            <ErrorBoundary>
+              <Navigation />
+            </ErrorBoundary>
+          </View>
+        </React.Fragment>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 
@@ -73,14 +102,10 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      {/* On web the phone layout is centred at a phone-like width. */}
-      <View style={[{ flex: 1, backgroundColor: colors.bg }, Platform.OS === 'web' ? { width: '100%', maxWidth: 480, alignSelf: 'center' } : null]}>
-        <AuthProvider>
-          <Navigation />
-        </AuthProvider>
-      </View>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>{(remountKey) => <ThemedShell remountKey={remountKey} />}</ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

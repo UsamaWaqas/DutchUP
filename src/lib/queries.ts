@@ -98,6 +98,47 @@ export async function fetchGroups(userId: string, viewerCurrency: string): Promi
   });
 }
 
+/* -------------------------------------------------------------------- search */
+export interface SearchResults {
+  groups: { id: string; name: string; icon: IconName }[];
+  expenses: { id: string; description: string; amount: number; currency: string; groupId: string | null; groupName: string | null }[];
+}
+
+/** Groups by name + expenses by description, both scoped by RLS to what the user can already see. */
+export async function searchAll(userId: string, queryText: string): Promise<SearchResults> {
+  const q = queryText.trim();
+  if (!q) return { groups: [], expenses: [] };
+
+  const [{ data: memberRows, error: mErr }, { data: expenseRows, error: eErr }] = await Promise.all([
+    supabase.from('group_members').select('groups(id, name, icon)').eq('user_id', userId),
+    supabase
+      .from('expenses')
+      .select('id, description, amount, currency, group_id, groups(name)')
+      .ilike('description', `%${q}%`)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ]);
+  if (mErr) throw mErr;
+  if (eErr) throw eErr;
+
+  const needle = q.toLowerCase();
+  const groups = (memberRows ?? [])
+    .map((r) => r.groups as unknown as { id: string; name: string; icon: IconName } | null)
+    .filter((g): g is { id: string; name: string; icon: IconName } => !!g && g.name.toLowerCase().includes(needle));
+
+  const expenses = (expenseRows ?? []).map((e) => ({
+    id: e.id as string,
+    description: e.description as string,
+    amount: Number(e.amount),
+    currency: e.currency as string,
+    groupId: e.group_id as string | null,
+    groupName: (e.groups as any)?.name ?? null,
+  }));
+
+  return { groups, expenses };
+}
+
 /* ------------------------------------------------------- recurring expenses */
 function addInterval(dateStr: string, rule: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -478,7 +519,10 @@ export async function addFriend(userId: string, email: string): Promise<AddFrien
 
 export async function createGroup(params: { name: string; icon: IconName; createdBy: string; members: Person[] }): Promise<string> {
   const { data: group, error } = await supabase.from('groups').insert({ name: params.name, icon: params.icon, created_by: params.createdBy }).select('id').single();
-  if (error) throw error;
+  if (error) {
+    console.error('createGroup insert failed', error);
+    throw error;
+  }
   const groupId = group.id as string;
 
   const others = params.members.filter((p) => p.id !== params.createdBy);
@@ -510,6 +554,8 @@ export interface AddExpenseInput {
   category: string;
   splitType: 'equal' | 'exact' | 'percentage' | 'items';
   splits: { userId: string; amountOwed: number; share?: number }[];
+  /** Who paid, and how much each paid — must sum to `amount`. Defaults to createdBy paying it all. */
+  payers?: { userId: string; amountPaid: number }[];
   recurringRule?: string | null;
   items?: { name: string; price: number; userIds: string[] }[];
 }
@@ -532,7 +578,10 @@ export async function addExpense(input: AddExpenseInput): Promise<void> {
   if (error) throw error;
   const expenseId = expense.id as string;
 
-  const { error: payerErr } = await supabase.from('expense_payers').insert({ expense_id: expenseId, user_id: input.createdBy, amount_paid: input.amount });
+  const payers = input.payers && input.payers.length > 0 ? input.payers : [{ userId: input.createdBy, amountPaid: input.amount }];
+  const { error: payerErr } = await supabase
+    .from('expense_payers')
+    .insert(payers.map((p) => ({ expense_id: expenseId, user_id: p.userId, amount_paid: p.amountPaid })));
   if (payerErr) throw payerErr;
 
   const { error: splitErr } = await supabase.from('expense_splits').insert(input.splits.map((s) => ({ expense_id: expenseId, user_id: s.userId, amount_owed: s.amountOwed, share: s.share ?? null })));
@@ -687,6 +736,8 @@ export interface UpdateExpenseInput {
   category: string;
   splitType: 'equal' | 'exact' | 'percentage';
   splits: { userId: string; amountOwed: number; share?: number }[];
+  /** Who paid, and how much each paid — must sum to `amount`. */
+  payers: { userId: string; amountPaid: number }[];
   previous: { description: string; amount: number; category: string; splits: { userId: string; amountOwed: number }[] };
 }
 
@@ -710,7 +761,11 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<void> {
     .insert(input.splits.map((s) => ({ expense_id: input.expenseId, user_id: s.userId, amount_owed: s.amountOwed, share: s.share ?? null })));
   if (insErr) throw insErr;
 
-  const { error: payerErr } = await supabase.from('expense_payers').update({ amount_paid: input.amount }).eq('expense_id', input.expenseId);
+  const { error: delPayerErr } = await supabase.from('expense_payers').delete().eq('expense_id', input.expenseId);
+  if (delPayerErr) throw delPayerErr;
+  const { error: payerErr } = await supabase
+    .from('expense_payers')
+    .insert(input.payers.map((p) => ({ expense_id: input.expenseId, user_id: p.userId, amount_paid: p.amountPaid })));
   if (payerErr) throw payerErr;
 
   const changes: Record<string, { from: unknown; to: unknown }> = {};

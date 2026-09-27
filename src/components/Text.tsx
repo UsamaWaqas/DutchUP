@@ -21,12 +21,15 @@ export interface TProps extends TextProps {
 }
 
 /** The one text primitive: maps CSS-like props from the design onto RN text styles. */
-export function T({ size = 15, w = 'regular', color = colors.ink, lh, ls, upper, serif, italic, num, align, style, ...rest }: TProps) {
+export function T({ size = 15, w = 'regular', color = colors.ink, lh, ls, upper, serif, italic, num, align, style, maxFontSizeMultiplier, ...rest }: TProps) {
   const family = serif ? (italic ? fonts.serifItalic : fonts.serif) : fonts[w];
   const line = lh ?? 1.4;
   return (
     <RNText
       {...rest}
+      // Caps how far the device's accessibility text-size setting can stretch fixed-width
+      // UI (buttons, pills, tab labels) before it starts clipping or wrapping badly.
+      maxFontSizeMultiplier={maxFontSizeMultiplier ?? 1.3}
       style={[
         {
           fontFamily: family,

@@ -5,6 +5,7 @@ import { colors } from '@/theme';
 import { rs } from '@/lib/format';
 import { fetchHomeSummary, HomeSummary } from '@/lib/queries';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { Avatar } from '@/components/Avatar';
 import { ActionSheet, IconButton, Tabs } from '@/components/Controls';
 import { Icon } from '@/components/Icon';
@@ -17,6 +18,7 @@ type Filter = 'All' | 'You owe' | 'Owed to you';
 export default function Home() {
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
+  const { t } = useI18n();
   const [filter, setFilter] = useState<Filter>('All');
   const [summary, setSummary] = useState<HomeSummary | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -53,7 +55,7 @@ export default function Home() {
       overlay={
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add expense"
+          accessibilityLabel={t('home.addExpense')}
           onPress={() => router.push('/add-expense')}
           style={{
             position: 'absolute',
@@ -72,25 +74,25 @@ export default function Home() {
         >
           <Icon name="plus" size={21} color={colors.orange} strokeWidth={2.2} />
           <T size={15} w="bold" color={colors.ink} ls={0.01}>
-            Add expense
+            {t('home.addExpense')}
           </T>
         </Pressable>
       }
     >
       <View style={{ paddingHorizontal: 20, gap: 14 }}>
         <LargeTitle
-          title="Home"
+          title={t('home.title')}
           right={
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <IconButton icon="search" label="Search" />
-              <IconButton icon="user-plus" label="Add a friend" onPress={() => router.push('/add-friend')} />
+              <IconButton icon="search" label={t('home.search')} onPress={() => router.push('/search')} />
+              <IconButton icon="user-plus" label={t('home.addFriend')} onPress={() => router.push('/add-friend')} />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Your profile"
+                accessibilityLabel={t('home.yourProfile')}
                 onPress={() => setAccountMenuOpen(true)}
                 style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
               >
-                {user ? <Avatar person={{ id: user.id, name: 'You' }} size={34} /> : null}
+                {user ? <Avatar person={{ id: user.id, name: profile?.full_name || 'You' }} size={34} /> : null}
               </Pressable>
             </View>
           }
@@ -98,7 +100,7 @@ export default function Home() {
 
         <Hero motifHeight={230} padTop={22} padBottom={20} gap={16}>
           <View style={{ gap: 8 }}>
-            <Eyebrow>Net balance</Eyebrow>
+            <Eyebrow>{t('home.netBalance')}</Eyebrow>
             <MoneyBig value={Math.abs(totals.owed - totals.owe)} currency={currency} size={60} rsSize={24} />
           </View>
           <View style={{ flexDirection: 'row', gap: 3, height: 6 }}>
@@ -107,10 +109,10 @@ export default function Home() {
           </View>
           <View style={{ flexDirection: 'row', gap: 16 }}>
             {[
-              { label: 'You’re owed', value: totals.owed, color: colors.mint },
-              { label: 'You owe', value: totals.owe, color: colors.coral },
+              { key: 'owed', label: t('home.youreOwed'), value: totals.owed, color: colors.mint },
+              { key: 'owe', label: t('home.youOwe'), value: totals.owe, color: colors.coral },
             ].map((c) => (
-              <View key={c.label} style={{ flex: 1, gap: 3 }}>
+              <View key={c.key} style={{ flex: 1, gap: 3 }}>
                 <T size={11.5} upper ls={0.1} color={colors.onDeep}>
                   {c.label}
                 </T>
@@ -126,16 +128,16 @@ export default function Home() {
           active={filter}
           onChange={setFilter}
           items={[
-            { label: 'All', count: friends.length },
-            { label: 'You owe', count: friends.filter((f) => !f.owed).length },
-            { label: 'Owed to you', count: friends.filter((f) => f.owed).length },
+            { label: 'All', display: t('home.all'), count: friends.length },
+            { label: 'You owe', display: t('home.youOwe'), count: friends.filter((f) => !f.owed).length },
+            { label: 'Owed to you', display: t('home.owedToYou'), count: friends.filter((f) => f.owed).length },
           ]}
         />
 
         {loadError ? (
           <View style={{ paddingTop: 40, alignItems: 'center' }}>
             <T size={14} color={colors.muted}>
-              Couldn't load your balances. Pull to refresh or try again.
+              {t('home.couldntLoadBalances')}
             </T>
           </View>
         ) : !summary ? (
@@ -145,7 +147,7 @@ export default function Home() {
         ) : rows.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <T size={14} color={colors.muted}>
-              {friends.length === 0 ? 'All settled up — nothing owed either way.' : 'Nothing here.'}
+              {friends.length === 0 ? t('home.allSettled') : t('home.nothingHere')}
             </T>
           </View>
         ) : (
@@ -154,7 +156,7 @@ export default function Home() {
               <Pressable
                 key={f.person.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${f.person.name}, ${f.owed ? 'owes you' : 'you owe'} ${rs(f.amount, currency)}`}
+                accessibilityLabel={`${f.person.name}, ${f.owed ? t('home.owesYou') : t('home.youOweLower')} ${rs(f.amount, currency)}`}
                 onPress={f.owed ? undefined : () => router.push({ pathname: '/settle', params: { groupId: f.groupId, otherUserId: f.person.id } })}
                 style={[{ minHeight: 58, paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, i > 0 ? rowDivider : null]}
               >
@@ -169,7 +171,7 @@ export default function Home() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <T size={12} color={colors.muted}>
-                    {f.owed ? 'owes you' : 'you owe'}
+                    {f.owed ? t('home.owesYou') : t('home.youOweLower')}
                   </T>
                   <T size={15} w="bold" color={f.owed ? colors.green : colors.red} num>
                     {rs(f.amount, currency)}
@@ -184,10 +186,11 @@ export default function Home() {
     <ActionSheet
       visible={accountMenuOpen}
       onClose={() => setAccountMenuOpen(false)}
-      title="Account"
+      title={t('account.title')}
       items={[
-        { label: 'Notification settings', icon: 'bell', onPress: () => router.push('/notifications') },
-        { label: 'Sign out', icon: 'x', destructive: true, onPress: signOut },
+        { label: t('account.notificationSettings'), icon: 'bell', onPress: () => router.push('/notifications') },
+        { label: t('settings.title'), icon: 'settings', onPress: () => router.push('/settings') },
+        { label: t('account.signOut'), icon: 'x', destructive: true, onPress: signOut },
       ]}
     />
     </>

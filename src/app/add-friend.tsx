@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { colors } from '@/theme';
 import { addFriend } from '@/lib/queries';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { Person } from '@/lib/person';
 import { Avatar } from '@/components/Avatar';
 import { SearchField } from '@/components/Controls';
@@ -20,6 +21,7 @@ interface Row {
 export default function AddFriend() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<Row[]>([]);
@@ -31,16 +33,16 @@ export default function AddFriend() {
     try {
       const result = await addFriend(user.id, value);
       if (added.some((r) => r.person.id === result.person.id)) {
-        Alert.alert('Already added', 'You already added that person.');
+        Alert.alert(t('addFriend.alreadyAdded'), t('addFriend.alreadyAddedBody'));
         return;
       }
       setAdded((cur) => [{ person: result.person, pending: result.pending }, ...cur]);
       setEmail('');
       if (result.pending) {
-        Alert.alert('No DutchUp account yet', `${value} isn't on DutchUp yet. Once they sign up with this email, they'll show up in your groups.`);
+        Alert.alert(t('addFriend.noAccountYetTitle'), t('addFriend.noAccountYetBody', { email: value }));
       }
     } catch (e: any) {
-      Alert.alert("Couldn't add friend", e?.message ?? 'Please try again.');
+      Alert.alert(t('addFriend.couldntAdd'), e?.message ?? t('common.tryAgain'));
     } finally {
       setAdding(false);
     }
@@ -48,13 +50,13 @@ export default function AddFriend() {
 
   return (
     <Screen bottomPad={20}>
-      <TopBar title="Add a friend" icon="x" label="Close" onPress={() => router.back()} />
+      <TopBar title={t('addFriend.title')} icon="x" label={t('common.close')} onPress={() => router.back()} />
       <View style={{ paddingHorizontal: 20, paddingTop: 8, gap: 16 }}>
         <T size={14} color={colors.muted}>
-          Add someone by email — no group needed. They'll show up here once they're on DutchUp.
+          {t('addFriend.intro')}
         </T>
 
-        <SearchField placeholder="Friend's email" value={email} onChangeText={setEmail} onSubmitEditing={onAdd} keyboardType="email-address" icon={adding ? 'search' : 'user-plus'} />
+        <SearchField placeholder={t('addFriend.emailPlaceholder')} value={email} onChangeText={setEmail} onSubmitEditing={onAdd} keyboardType="email-address" icon={adding ? 'search' : 'user-plus'} />
 
         {added.length > 0 ? (
           <Card>
@@ -72,7 +74,7 @@ export default function AddFriend() {
                     {r.person.name}
                   </T>
                   <T size={12.5} color={colors.muted}>
-                    {r.pending ? 'Invited · will appear when they sign up' : 'Added as a friend'}
+                    {r.pending ? t('addFriend.invitedWillAppear') : t('addFriend.addedAsFriend')}
                   </T>
                 </View>
                 {r.pending ? null : <Icon name="check" size={18} color={colors.green} strokeWidth={2.4} />}

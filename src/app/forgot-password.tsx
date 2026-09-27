@@ -7,12 +7,14 @@ import { colors, TOP_INSET } from '@/theme';
 import { Button, Field, IconButton } from '@/components/Controls';
 import { T } from '@/components/Text';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 
 /** Forgot password — sends a Supabase reset-password email. */
 export default function ForgotPassword() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { resetPasswordForEmail } = useAuth();
+  const { t } = useI18n();
 
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,7 +23,7 @@ export default function ForgotPassword() {
 
   const onSend = async () => {
     if (!email.trim()) {
-      setError('Enter your account email.');
+      setError(t('auth.enterAccountEmail'));
       return;
     }
     setError(null);
@@ -40,31 +42,31 @@ export default function ForgotPassword() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <IconButton icon="chevron-left" label="Back" color={colors.ivory} onPress={() => router.back()} />
+        <IconButton icon="chevron-left" label={t('common.back')} color={colors.ivory} onPress={() => router.back()} />
 
         {sent ? (
           <View style={{ flex: 1, justifyContent: 'center', gap: 14 }}>
             <T serif size={34} color={colors.ivory}>
-              Check your email
+              {t('auth.checkYourEmail')}
             </T>
             <T size={15} lh={1.55} color={colors.onDeep}>
-              If an account exists for {email}, a reset link has been sent.
+              {t('auth.resetLinkSent', { email })}
             </T>
-            <Button label="Back to log in" kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
+            <Button label={t('auth.backToLogIn')} kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
           </View>
         ) : (
           <>
             <View style={{ marginTop: 24 }}>
               <T serif size={44} lh={1} ls={-0.02} color={colors.ivory} accessibilityRole="header">
-                Reset password
+                {t('auth.resetPasswordTitle')}
               </T>
             </View>
             <T size={15} lh={1.55} color={colors.onDeep} style={{ marginTop: 12 }}>
-              Enter your email and we'll send you a link to reset your password.
+              {t('auth.enterEmailForReset')}
             </T>
 
             <View style={{ marginTop: 28, gap: 14 }}>
-              <Field dark label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" placeholder="you@example.com" />
+              <Field dark label={t('auth.email')} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" placeholder="you@example.com" />
             </View>
 
             {error ? (
@@ -79,7 +81,7 @@ export default function ForgotPassword() {
                   <ActivityIndicator color={colors.ivory} />
                 </View>
               ) : (
-                <Button label="Send reset link" kind="ivory" onPress={onSend} />
+                <Button label={t('auth.sendResetLink')} kind="ivory" onPress={onSend} />
               )}
             </View>
           </>

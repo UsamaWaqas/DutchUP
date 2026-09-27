@@ -8,15 +8,17 @@ import { categoryIcon, categoryLabel } from '@/lib/categories';
 import { exportCsv } from '@/lib/csv';
 import { fetchGroupDetail, fetchGroupExpensesForExport, GroupDetail, SpendingSlice } from '@/lib/queries';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { Person } from '@/lib/person';
 import { Avatar, AvatarStack } from '@/components/Avatar';
 import { Button, IconButton } from '@/components/Controls';
 import { Icon } from '@/components/Icon';
-import { Card, Eyebrow, Hero, MoneyBig, Screen, SectionLabel, Tile, TopBar, rowDivider } from '@/components/Layout';
+import { BottomSheet, Card, Eyebrow, Hero, MoneyBig, Screen, SectionLabel, SheetActions, Tile, TopBar, rowDivider } from '@/components/Layout';
 import { T } from '@/components/Text';
 
 /** Ranked single-series bars: each row is already text-labeled, so one accent colour carries every bar. */
 function CategoryBars({ data, currency }: { data: SpendingSlice[]; currency: string }) {
+  const { t } = useI18n();
   const max = Math.max(1, ...data.map((d) => d.amount));
   return (
     <View style={{ gap: 12 }}>
@@ -24,7 +26,7 @@ function CategoryBars({ data, currency }: { data: SpendingSlice[]; currency: str
         <View key={d.label} style={{ gap: 5 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <T size={13} w="semibold">
-              {categoryLabel(d.label)}
+              {categoryLabel(d.label, t)}
             </T>
             <T size={13} w="bold" color={colors.muted} num>
               {rs(d.amount, currency)}
@@ -83,26 +85,48 @@ export default function GroupDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
+  const { t } = useI18n();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [picking, setPicking] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (!user || !id) return;
       let mounted = true;
-      fetchGroupDetail(id, user.id, profile?.default_currency ?? 'PKR').then((detail) => {
-        if (mounted) setGroup(detail);
-      });
+      setLoadError(false);
+      fetchGroupDetail(id, user.id, profile?.default_currency ?? 'PKR')
+        .then((detail) => {
+          if (mounted) setGroup(detail);
+        })
+        .catch((err) => {
+          console.error('fetchGroupDetail failed', err);
+          if (mounted) setLoadError(true);
+        });
       return () => {
         mounted = false;
       };
     }, [user, id, profile]),
   );
 
+  if (loadError) {
+    return (
+      <Screen bottomPad={20}>
+        <TopBar label={t('group.backToGroups')} onPress={() => router.back()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
+          <T size={14} color={colors.muted}>
+            {t('group.couldntLoadGroup')}
+          </T>
+        </View>
+      </Screen>
+    );
+  }
+
   if (!group) {
     return (
       <Screen bottomPad={20}>
-        <TopBar label="Back to groups" onPress={() => router.back()} />
+        <TopBar label={t('group.backToGroups')} onPress={() => router.back()} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
           <ActivityIndicator color={colors.deep} />
         </View>
@@ -119,6 +143,7 @@ export default function GroupDetailScreen() {
   };
 
   const handleSettlePress = () => {
+    if (otherMembers.length === 0) return; // nobody else in the group to settle with
     if (balanceOwners.length === 1) {
       goSettle(balanceOwners[0].person.id);
     } else if (otherMembers.length === 1) {
@@ -128,22 +153,14 @@ export default function GroupDetailScreen() {
     }
   };
 
-  const openGroupMenu = () => {
-    Alert.alert(group.name, undefined, [
-      {
-        text: 'Export expenses (CSV)',
-        onPress: async () => {
-          try {
-            const rows = await fetchGroupExpensesForExport(group.id);
-            await exportCsv(group.name, rows);
-          } catch (e: any) {
-            Alert.alert('Couldn’t export', e?.message ?? 'Please try again.');
-          }
-        },
-      },
-      { text: 'Notification settings', onPress: () => router.push('/notifications') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const exportExpenses = async () => {
+    setMenuOpen(false);
+    try {
+      const rows = await fetchGroupExpensesForExport(group.id);
+      await exportCsv(group.name, rows);
+    } catch (e: any) {
+      Alert.alert(t('group.couldntExport'), e?.message ?? t('common.tryAgain'));
+    }
   };
 
   return (
@@ -151,24 +168,20 @@ export default function GroupDetailScreen() {
       bottomPad={20}
       footer={
         <View style={{ flexDirection: 'row', gap: 12, paddingTop: 12, paddingHorizontal: 20, paddingBottom: Math.max(insets.bottom, 28), backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line }}>
-          <Button label="Settle up" kind="outline" grow={1} onPress={handleSettlePress} />
-          <Button label="Add expense" icon="plus" grow={1.3} onPress={() => router.push({ pathname: '/add-expense', params: { groupId: group.id } })} />
+          <Button label={t('settle.title')} kind="outline" grow={1} onPress={handleSettlePress} disabled={otherMembers.length === 0} />
+          <Button label={t('home.addExpense')} icon="plus" grow={1.3} onPress={() => router.push({ pathname: '/add-expense', params: { groupId: group.id } })} />
         </View>
       }
       overlay={
-        picking ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            onPress={() => setPicking(false)}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(14,20,36,0.5)', alignItems: 'center', justifyContent: 'flex-end' }}
-          >
-            <Pressable style={{ width: '100%', backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: Math.max(insets.bottom, 24), paddingTop: 12 }}>
-              <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
-                <T size={16} w="bold">
-                  Settle up with
+        <>
+          <BottomSheet visible={picking} onClose={() => setPicking(false)} title={t('group.settleUpWith')}>
+            {otherMembers.length === 0 ? (
+              <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+                <T size={14} color={colors.muted}>
+                  {t('group.noOtherMembers')}
                 </T>
               </View>
+            ) : (
               <Card style={{ marginHorizontal: 20 }}>
                 {otherMembers.map((p, i) => (
                   <Pressable key={p.id} accessibilityRole="button" onPress={() => goSettle(p.id)} style={[{ minHeight: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, i > 0 ? rowDivider : null]}>
@@ -179,12 +192,20 @@ export default function GroupDetailScreen() {
                   </Pressable>
                 ))}
               </Card>
-            </Pressable>
-          </Pressable>
-        ) : undefined
+            )}
+          </BottomSheet>
+          <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={group.name}>
+            <SheetActions
+              items={[
+                { label: t('group.exportExpenses'), icon: 'share', onPress: exportExpenses },
+                { label: t('account.notificationSettings'), icon: 'bell', onPress: () => { setMenuOpen(false); router.push('/notifications'); } },
+              ]}
+            />
+          </BottomSheet>
+        </>
       }
     >
-      <TopBar label="Back to groups" onPress={() => router.back()} right={<IconButton icon="more" label="Group settings" onPress={openGroupMenu} />} />
+      <TopBar label={t('group.backToGroups')} onPress={() => router.back()} right={<IconButton icon="more" label={t('group.groupSettings')} onPress={() => setMenuOpen(true)} />} />
       <View style={{ paddingHorizontal: 20, paddingTop: 6, gap: 16 }}>
         <Hero motifHeight={230}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -196,7 +217,7 @@ export default function GroupDetailScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
                 <AvatarStack people={group.members} size={28} ring={colors.deep} dark />
                 <T size={13} color={colors.onDeep}>
-                  {`${group.members.length} member${group.members.length === 1 ? '' : 's'}`}
+                  {t('group.member', { count: group.members.length })}
                 </T>
               </View>
             </View>
@@ -204,12 +225,12 @@ export default function GroupDetailScreen() {
           <View style={{ height: 1, backgroundColor: colors.hairDeep }} />
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
             <View style={{ gap: 8 }}>
-              <Eyebrow color={colors.mint}>{group.myNet >= 0 ? 'You’re owed' : 'You owe'}</Eyebrow>
+              <Eyebrow color={colors.mint}>{group.myNet >= 0 ? t('home.youreOwed') : t('home.youOwe')}</Eyebrow>
               <MoneyBig value={Math.abs(group.myNet)} currency={group.currency} size={52} rsSize={22} />
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4, paddingBottom: 4 }}>
               <T size={11.5} upper ls={0.1} color={colors.onDeep}>
-                Total spent
+                {t('group.totalSpent')}
               </T>
               <T size={16} w="bold" color={colors.ivory} num>
                 {rs(group.totalSpent, group.currency)}
@@ -220,7 +241,7 @@ export default function GroupDetailScreen() {
 
         {group.balances.length > 0 ? (
           <>
-            <SectionLabel label="Balances" right={group.balancesLabel} />
+            <SectionLabel label={t('group.balances')} right={group.balancesLabel} />
             <View style={{ gap: 8 }}>
               {[group.balances.slice(0, 2), group.balances.slice(2, 4)].filter((p) => p.length).map((pair, i) => (
                 <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
@@ -235,7 +256,7 @@ export default function GroupDetailScreen() {
 
         {group.spendingByCategory.length > 0 ? (
           <>
-            <SectionLabel label="Spending by category" />
+            <SectionLabel label={t('group.spendingByCategory')} />
             <Card style={{ padding: 16 }}>
               <CategoryBars data={group.spendingByCategory} currency={group.currency} />
             </Card>
@@ -244,18 +265,18 @@ export default function GroupDetailScreen() {
 
         {group.spendingByMonth.some((m) => m.amount > 0) ? (
           <>
-            <SectionLabel label="Spending over time" />
+            <SectionLabel label={t('group.spendingOverTime')} />
             <Card style={{ padding: 16, paddingTop: 20 }}>
               <MonthBars data={group.spendingByMonth} currency={group.currency} />
             </Card>
           </>
         ) : null}
 
-        <SectionLabel label="Expenses" right={`${group.expenses.length} expense${group.expenses.length === 1 ? '' : 's'}`} />
+        <SectionLabel label={t('search.expenses')} right={t('group.expensesCount', { count: group.expenses.length })} />
         {group.expenses.length === 0 ? (
           <View style={{ paddingVertical: 24, alignItems: 'center' }}>
             <T size={14} color={colors.muted}>
-              No expenses yet — add the first one below.
+              {t('group.noExpensesYet')}
             </T>
           </View>
         ) : (

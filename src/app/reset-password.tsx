@@ -7,6 +7,7 @@ import { colors, TOP_INSET } from '@/theme';
 import { Button, Field } from '@/components/Controls';
 import { T } from '@/components/Text';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
 /** Parses the recovery link Supabase opens `dutchup://reset-password` with, either as
@@ -36,6 +37,7 @@ export default function ResetPassword() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { session, updatePassword, signOut } = useAuth();
+  const { t } = useI18n();
 
   const [checking, setChecking] = useState(true);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -68,11 +70,11 @@ export default function ResetPassword() {
 
   const onSave = async () => {
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.passwordMin6'));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords don't match.");
+      setError(t('auth.passwordsDontMatch'));
       return;
     }
     setError(null);
@@ -107,37 +109,37 @@ export default function ResetPassword() {
         ) : linkError || !session ? (
           <View style={{ flex: 1, justifyContent: 'center', gap: 14 }}>
             <T serif size={34} color={colors.ivory}>
-              Link expired
+              {t('auth.linkExpired')}
             </T>
             <T size={15} lh={1.55} color={colors.onDeep}>
-              {linkError ?? 'This reset link is no longer valid.'} Request a new one from the login screen.
+              {linkError ?? t('auth.linkNoLongerValid')} {t('auth.requestNewOne')}
             </T>
-            <Button label="Back to log in" kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
+            <Button label={t('auth.backToLogIn')} kind="ivory" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />
           </View>
         ) : done ? (
           <View style={{ flex: 1, justifyContent: 'center', gap: 14 }}>
             <T serif size={34} color={colors.ivory}>
-              Password updated
+              {t('auth.passwordUpdated')}
             </T>
             <T size={15} lh={1.55} color={colors.onDeep}>
-              You're all set — continue into DutchUp.
+              {t('auth.allSetContinue')}
             </T>
-            <Button label="Continue" kind="ivory" onPress={onDoneContinue} style={{ marginTop: 10 }} />
+            <Button label={t('auth.continueLabel')} kind="ivory" onPress={onDoneContinue} style={{ marginTop: 10 }} />
           </View>
         ) : (
           <>
             <View style={{ marginTop: 24 }}>
               <T serif size={44} lh={1} ls={-0.02} color={colors.ivory} accessibilityRole="header">
-                Set a new password
+                {t('auth.setNewPassword')}
               </T>
             </View>
             <T size={15} lh={1.55} color={colors.onDeep} style={{ marginTop: 12 }}>
-              Choose a new password for your account.
+              {t('auth.chooseNewPassword')}
             </T>
 
             <View style={{ marginTop: 28, gap: 14 }}>
-              <Field dark label="New password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password-new" placeholder="At least 6 characters" />
-              <Field dark label="Confirm new password" value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="password-new" placeholder="Re-enter password" />
+              <Field dark label={t('auth.newPassword')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password-new" placeholder={t('auth.atLeast6Chars')} />
+              <Field dark label={t('auth.confirmNewPassword')} value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="password-new" placeholder={t('auth.reenterPassword')} />
             </View>
 
             {error ? (
@@ -152,11 +154,11 @@ export default function ResetPassword() {
                   <ActivityIndicator color={colors.ivory} />
                 </View>
               ) : (
-                <Button label="Save password" kind="ivory" onPress={onSave} />
+                <Button label={t('auth.savePassword')} kind="ivory" onPress={onSave} />
               )}
             </View>
 
-            <Button label="Cancel" kind="outline-dark" onPress={onBackToLogin} style={{ marginTop: 12 }} />
+            <Button label={t('common.cancel')} kind="outline-dark" onPress={onBackToLogin} style={{ marginTop: 12 }} />
           </>
         )}
       </ScrollView>

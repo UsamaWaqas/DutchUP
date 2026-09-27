@@ -43,7 +43,9 @@ interface StackProps {
 /** Overlapping avatars: 18% overlap, 2px ring in the surface colour, optional "+N" bubble. */
 export function AvatarStack({ people, size = 28, ring = colors.surface, dark = false, more }: StackProps) {
   const ov = Math.round(size * 0.18);
-  const ringStyle = { borderRadius: size, boxShadow: `0 0 0 2px ${ring}` } as const;
+  // A plain border reproduces the same "ring" look as a 0-blur/2px-spread box-shadow,
+  // without the expensive per-frame shadow rendering boxShadow causes on Android.
+  const ringStyle = { borderRadius: size, borderWidth: 2, borderColor: ring } as const;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 2 }}>
       {people.map((p, i) => (

@@ -22,6 +22,8 @@ export function categoryIcon(key: string): IconName {
   return ICON_BY_KEY[key] ?? 'wallet';
 }
 
-export function categoryLabel(key: string): string {
+/** Pass `t` (from useI18n) to translate; falls back to the English label if omitted. */
+export function categoryLabel(key: string, t?: (k: string) => string): string {
+  if (t && key in LABEL_BY_KEY) return t(`category.${key}`);
   return LABEL_BY_KEY[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
 }

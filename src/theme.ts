@@ -1,15 +1,20 @@
 /**
- * DutchUp design tokens ("Delft": porcelain ground, Delft-navy surfaces, cobalt links,
- * small orange accents). Values are copied 1:1 from the approved design.
+ * DutchUp design tokens ("Delft" origins, now a warm cognac "Ledger Leather" palette).
+ * `colors` is a single mutable object — every screen imports it once and reads
+ * `colors.x` at render time. Switching theme mode mutates these same values in
+ * place (see `applyColorScheme` in `lib/theme-context.tsx`) and forces one
+ * remount at the root, so no screen needs to import a hook to stay theme-aware.
  */
-export const colors = {
+type Palette = Record<string, string>;
+
+const light: Palette = {
   bg: '#F4F3EE', // porcelain
   surface: '#FFFFFF',
   ink: '#1C140D',
   muted: '#7A6A58',
   line: '#E3E2DA',
   ctrl: '#9C8B76', // borders of inputs / chips / outline buttons
-  deep: '#4A2A14', // saddle brown (was Delft navy)
+  deep: '#4A2A14', // saddle brown
   ivory: '#F6F3EA',
   onDeep: '#D9B99A',
   hairDeep: 'rgba(246,243,234,0.16)',
@@ -27,11 +32,57 @@ export const colors = {
   track: '#EDE3D6',
   motif: '#8A5A34',
   motifWelcome: '#B98455',
-  // "Ledger Leather" treatment — warm, tactile, on-theme with DutchUp as a shared ledger.
-  // Used for cards and buttons (flat, no gradient); Hero/auth screens stay on `deep`.
-  leather: '#D6A579', // light cognac
+  // "Ledger Leather" treatment — cards and buttons (flat, no gradient); Hero/auth screens use `deep`.
+  leather: '#D6A579',
   leatherThread: 'rgba(58,28,10,0.4)',
-} as const;
+  // balanced/unbalanced strips (add-expense split + payer totals)
+  balancedBg: '#E3F3EB',
+  balancedFg: '#0B4F36',
+  warnBg: '#FBE9E6',
+  warnFg: '#C0392B',
+};
+
+const dark: Palette = {
+  bg: '#17120C',
+  surface: '#241A10',
+  ink: '#F1E8DD',
+  muted: '#B3A08A',
+  line: '#3A2E20',
+  ctrl: '#6E5A44',
+  deep: '#5C371C',
+  ivory: '#F6F3EA',
+  onDeep: '#D9B99A',
+  hairDeep: 'rgba(246,243,234,0.16)',
+  cobalt: '#E3A05C',
+  cobaltLight: 'rgba(227,160,92,0.18)',
+  orange: '#FF8A54',
+  green: '#2FAE81',
+  greenTint: 'rgba(47,174,129,0.16)',
+  greenDark: '#6FE3B8',
+  red: '#FF9E8F',
+  mint: '#7EE2B5',
+  coral: '#FF9E8F',
+  tile: '#3A2A18',
+  tileFg: '#EAC79A',
+  track: '#2C2115',
+  motif: '#8A5A34',
+  motifWelcome: '#B98455',
+  leather: '#7A4E2A',
+  leatherThread: 'rgba(255,230,200,0.35)',
+  balancedBg: 'rgba(47,174,129,0.16)',
+  balancedFg: '#6FE3B8',
+  warnBg: 'rgba(255,158,143,0.16)',
+  warnFg: '#FF9E8F',
+};
+
+export const palettes = { light, dark };
+
+/** Mutable — do not destructure at module scope; read `colors.x` inside render/style so theme switches apply. */
+export const colors: Palette = { ...light };
+
+export function applyColorScheme(scheme: 'light' | 'dark') {
+  Object.assign(colors, palettes[scheme]);
+}
 
 /** Font family names as registered by @expo-google-fonts (one family per weight on native). */
 export const fonts = {
