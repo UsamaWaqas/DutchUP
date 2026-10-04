@@ -1,117 +1,176 @@
-# DutchUp (React Native · Expo SDK 57)
+# DutchUp
 
-Splitwise-style expense splitting. The original 9 screens came from the approved "Delft" design; Phase 1
-(auth/groups/expenses/balances/settle up/activity), Phase 2 (categories, comments, edit history, CSV export,
-recurring expenses, notification-mute settings), and most of Phase 3 (itemized splitting, live-rate currency
-conversion, spending charts — OCR receipt scanning traded out, see Notes) from `Splitwise_Clone_Blueprint_Updated.docx`
-are wired to real Supabase data. See Notes below for what's simplified or still a placeholder.
+**A Splitwise-style expense-splitting app** — groups, shared expenses, itemized receipts, debt simplification, and multi-currency balances, all backed by Supabase (Postgres + Auth + row-level security) rather than a custom backend.
 
-- **Expo SDK 57** (latest at build time) · React Native 0.86 · React 19.2 · Expo Router 57 · TypeScript
-- Fonts: Instrument Serif + Manrope via `@expo-google-fonts/*` (bundled, no network at runtime)
-- Icons and the Delft-tile pattern are drawn with `react-native-svg` (no icon library needed)
+![Expo](https://img.shields.io/badge/Expo-57-000020?logo=expo&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white) ![Expo Router](https://img.shields.io/badge/Expo%20Router-57-000020?logo=expo&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth%20%2B%20RLS-3FCF8E?logo=supabase&logoColor=white) ![ML Kit](https://img.shields.io/badge/ML%20Kit-on--device%20OCR-4285F4?logo=google&logoColor=white)
 
-## Run
+---
+
+### Contents
+
+[What this is](#what-this-is) · [At a glance](#at-a-glance) · [Architecture](#architecture) · [Splitting & settling up](#splitting--settling-up) · [Receipt scanning](#receipt-scanning) · [Recurring expenses](#recurring-expenses) · [Multi-currency](#multi-currency) · [Auth & routing](#auth--routing) · [What's simplified](#whats-simplified) · [Project structure](#project-structure) · [Getting started](#getting-started)
+
+## What this is
+
+A group creates shared expenses, splits them equally, by exact amount, by percentage, or item-by-item, and DutchUp tracks who owes whom. Rather than settle every pairwise debt individually, it reduces a group's whole web of balances down to the fewest transactions that would clear it. Every table in Postgres is scoped by row-level security to the signed-in user's own groups — there's no application-layer authorization check standing in front of the database; the database itself refuses the wrong row.
+
+The original 9 screens came from an approved design ("Delft"), built out across three phases (auth/groups/expenses/balances/settle-up/activity → categories/comments/CSV export/recurring expenses → itemized splitting/live currency conversion/spending charts), with receipt OCR, theming, i18n, and a few more screens (Settings, Search, Add Friend) added since.
+
+## At a glance
+
+| | |
+|---|---|
+| **Platform** | Expo (React Native 0.86), iOS + Android + web (phone-width-constrained on web) |
+| **Navigation** | Expo Router, typed routes — a tab shell (Home, Groups, Activity) plus stack screens for auth, group/expense detail, settle-up, and settings |
+| **Backend** | Supabase — Postgres tables, email/password auth, and row-level security policies scoping every table to `auth.uid()`'s own groups/expenses; no server code of this app's own |
+| **State** | `AuthProvider` (session/profile), `ThemeProvider` (light/dark, persisted), `LanguageProvider` (9 locales, persisted) — all context, no global store |
+| **Data fetching** | Plain Supabase queries per screen (`src/lib/queries.ts`), refetched on focus — no realtime subscription, so another device's change needs a re-visit to show up |
+| **Debt math** | Pure, currency-agnostic functions (`src/lib/balances.ts`) — net balances, then a greedy min-transaction simplification |
+| **Currency** | A currency per expense, converted to each viewer's own default currency for aggregates, via a free live-rate API cached for an hour |
+| **Receipt OCR** | On-device — `expo-image-picker` + `@react-native-ml-kit/text-recognition`, no cloud call, no API key |
+| **i18n** | English, French, German, Spanish, Czech, Portuguese, Italian, Hindi, Turkish |
+
+## Architecture
+
+```mermaid
+flowchart TD
+    App["DutchUp app<br/>(Expo Router / React Native)"]
+    SDK["@supabase/supabase-js client"]
+    Auth["Supabase Auth<br/>email/password, password reset"]
+    PG[("Postgres<br/>profiles · groups · expenses ·<br/>expense_payers · expense_splits · settlements · activity_log")]
+    RLS["Row-level security policies<br/>scoped to auth.uid()"]
+    Rate["open.er-api.com<br/>(live exchange rates)"]
+    MLKit["ML Kit Text Recognition<br/>(on-device OCR)"]
+
+    App --> SDK
+    SDK --> Auth
+    SDK -->|every read/write| RLS
+    RLS --> PG
+    App -.->|convert aggregates| Rate
+    App -.->|scan a receipt| MLKit
+```
+
+Every query goes through the same Supabase client and the same RLS layer — there's no separate admin/service path in the app, so what a signed-in user can see and change is enforced the same way regardless of which screen asks. The two dotted integrations (rate lookup, OCR) are both best-effort: a failed rate call degrades to a 1:1 conversion rather than blocking a balance screen, and OCR runs entirely on-device, so there's no key to configure and no network dependency for it to fail.
+
+## Splitting & settling up
+
+A group's balances come from two pure functions in `src/lib/balances.ts`: `netBalances()` folds every payer, split, and settlement into one signed number per person (positive = owed money, negative = owes money), and `simplifyDebts()` then greedily matches the biggest debtor against the biggest creditor until everyone nets to zero — turning, say, five people's tangled IOUs into the smallest number of actual payments that would settle the group.
+
+```mermaid
+flowchart LR
+    Payers["expense_payers<br/>(who actually paid)"] --> Net["netBalances()"]
+    Splits["expense_splits<br/>(who owes what share)"] --> Net
+    Settled["settlements<br/>(payments already recorded)"] --> Net
+    Net --> Nets[("Net balance per person<br/>+owed / -owes")]
+    Nets --> Simplify["simplifyDebts() —<br/>greedy biggest-debtor ↔ biggest-creditor match"]
+    Simplify --> Edges["Minimal set of<br/>'A pays B $X' transactions"]
+```
+
+"Settle up" only **records** a payment (`settlements` insert) — it doesn't move real money. The Easypaisa/JazzCash/bank rows there are UI placeholders for wiring to a real payment deep link later.
+
+## Receipt scanning
+
+Add Expense → "Items" mode can prefill a total from a photographed receipt, entirely on-device: `expo-image-picker` captures or picks the image, `@react-native-ml-kit/text-recognition` reads the text locally, and a pure parser (`src/lib/receiptParser.ts`) guesses the total — checking labeled lines ("Grand Total", "Amount Due", "Total") before falling back to the largest number anywhere on the receipt.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Picker as expo-image-picker
+    participant MLKit as ML Kit Text Recognition
+    participant Parser as receiptParser.ts
+
+    User->>Picker: Take photo / pick from library
+    Picker-->>User: Image (or cancelled → stop, not an error)
+    Picker->>MLKit: Recognize text in image (on-device)
+    MLKit-->>Parser: Raw OCR text
+    Parser->>Parser: Look for a labeled total line
+    Parser-->>User: Best-guess amount (or null if unreadable)
+```
+
+Itemized expenses are create-only today — editing one afterwards isn't supported yet.
+
+## Recurring expenses
+
+A recurring expense has no cron or scheduled job behind it — it's a client-side catch-up. Opening a group checks the current user's own recurring templates in that group and inserts any past-due occurrences right there, before the screen's data loads.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App as DutchUp app
+    participant DB as Supabase (RLS: created_by = auth.uid())
+
+    User->>App: Opens a group
+    App->>DB: Fetch this user's recurring templates in this group
+    loop For each template still past-due
+        App->>App: Compute next occurrence date (weekly/fortnightly/monthly/yearly)
+        App->>DB: Insert the new expense + its payers/splits
+    end
+    App->>User: Group loads with any newly materialized expenses
+```
+
+Because every insert is RLS-gated to `created_by = auth.uid()`, this only ever advances when *the template's own creator* opens the group — no other member's client can generate someone else's recurring occurrence. A real schedule (occurrences appearing on time regardless of who opens the app) would need a Postgres cron job or a Supabase Edge Function, which isn't set up here.
+
+## Multi-currency
+
+Every expense has its own currency, and its own ledger row/detail screen always shows that original amount unconverted — a single expense's payers and splits never mix currencies, so there's nothing to convert to display it correctly on its own. Aggregates (Home totals, a group's hero balance, spending charts) convert into the *viewer's* `profiles.default_currency` using a free, keyless rate API, cached per base currency for an hour, falling back to a 1:1 rate if the API is unreachable rather than failing the screen.
+
+## Auth & routing
+
+`useProtectedRoute()` in `src/app/_layout.tsx` is the entire route guard: it watches the current Supabase session and the active route segment, and redirects — no session on a protected route bounces to the login screen; a live session on an auth-only route (signup, forgot-password) bounces to Home.
+
+```mermaid
+flowchart TD
+    Seg["Route segment changes"] --> Check{"Session present?"}
+    Check -->|no| Pub{"Is this route public?\n(signup / forgot-password / reset-password)"}
+    Pub -->|no| Login["Redirect to / (login)"]
+    Pub -->|yes| Stay1["Stay"]
+    Check -->|yes| AuthOnly{"Is this an auth-only route?\n(signup / forgot-password)"}
+    AuthOnly -->|yes| Home["Redirect to /(tabs)/home"]
+    AuthOnly -->|no| Stay2["Stay"]
+```
+
+## What's simplified
+
+- Google sign-in is a UI placeholder — email/password auth is fully wired to Supabase, OAuth is not configured.
+- Adding people to a group is by exact-email match; an unmatched email shows as "invited" for that session only — there's no pending-invite table yet.
+- Expenses always have a single payer (the current user) — "multiple payers" is a UI placeholder.
+- No realtime subscriptions — screens refetch on focus, so another device's change needs a re-visit to appear.
+- Push notifications are settings-only (mute/unmute per group); nothing actually sends a push yet — that needs `expo-notifications` plus a server-side sender.
+- CSV export shares plain text via the OS share sheet on native, and downloads a real `.csv` on web — native isn't yet a true file attachment.
+
+## Project structure
+
+```
+src/app/                  Expo Router routes — (tabs)/ shell (Home, Groups, Activity) plus
+                           auth screens, group/expense detail, settle-up, settings, search
+src/lib/
+  supabase.ts              Supabase client
+  auth-context.tsx         AuthProvider / useAuth() — session, profile, sign up/in/out, reset
+  theme-context.tsx        Light/dark/system mode, persisted
+  i18n.tsx + translations/ 9-language context, persisted
+  balances.ts              Pure debt math — netBalances(), simplifyDebts()
+  exchangeRates.ts         Live rate lookup, cached, degrades to 1:1 if unreachable
+  receiptScanner.ts        On-device OCR capture (ML Kit)
+  receiptParser.ts         Pure text parsing — guesses a receipt's total
+  queries.ts               Every Supabase read/write the screens use, incl. recurring
+                           expense materialization
+  csv.ts                   CSV building + platform export
+src/components/            Text, Controls, Layout, Avatar, Icon, Motif (Delft-tile pattern), ErrorBoundary
+supabase/schema.sql        Every table, the signup trigger, and all RLS policies
+```
+
+## Getting started
 
 ```bash
 npm install
 cp .env.example .env    # fill in your Supabase project URL + anon key
 npx expo start --dev-client   # or: npm run android / npm run ios (dev client build)
-npm run web             # quick browser preview
+npm run web              # quick browser preview
 npm run typecheck
 ```
 
-## Backend (Supabase)
-
+**Backend (Supabase):**
 1. Create a free project at supabase.com.
 2. Project Settings → API → copy the **Project URL** and **anon public** key into `.env` (never the `service_role` key).
-3. SQL Editor → New query → paste and run `supabase/schema.sql`. It creates every table (profiles, groups,
-   group_members, group_invites, friendships, expenses, expense_payers, expense_splits, expense_items,
-   expense_item_shares, expense_comments, expense_edit_history, settlements, activity_log, notification_settings),
-   a trigger that creates a `profiles` row on signup, and row-level-security policies scoping every table to the
-   signed-in user's own groups/expenses. It's written to be safe to re-run — always re-run it after pulling changes
-   that touch `supabase/schema.sql`, even on a project you set up before.
-4. Auth → URL Configuration → add `dutchup://reset-password` as a redirect URL (needed for the forgot-password flow).
-
-## Structure
-
-```
-src/
-  theme.ts                 colours, fonts, radii (design tokens)
-  components/
-    Text.tsx               T (CSS-like text props) + Rich (**bold** runs)
-    Icon.tsx, iconData.ts  stroke icons
-    Motif.tsx              Delft-tile pattern (explicit shapes, fades from a corner)
-    Avatar.tsx             Avatar, AvatarStack — generic Person-shaped, colours hashed from user id
-    Controls.tsx           Button, IconButton, Chip, Tabs, Segmented, Field, SearchField, Checkbox
-    Layout.tsx             Screen, TopBar, LargeTitle, SectionLabel, Card, Hero, MoneyBig, Tile, TabBar
-  lib/
-    supabase.ts            Supabase client (reads EXPO_PUBLIC_SUPABASE_* env vars)
-    auth-context.tsx       AuthProvider / useAuth() — session, profile, signUp/signIn/signOut/reset
-    person.ts              Person shape + deterministic avatar colours/initials
-    format.ts              rs() currency formatter
-    categories.ts          expense category list + icons
-    currencies.ts          curated currency list + symbolFor()
-    exchangeRates.ts       live rate lookup (open.er-api.com), cached, degrades to 1:1 if unreachable
-    balances.ts            pure debt math: netBalances(), simplifyDebts() — currency-agnostic on purpose
-    queries.ts             every Supabase read/write the screens use
-    csv.ts                 CSV building + platform export (browser download / native share sheet)
-  app/                     Expo Router routes
-    _layout.tsx            fonts, splash, AuthProvider, protected-route redirect, stack
-    index.tsx              Welcome / log in (real Supabase auth)
-    signup.tsx             Create account
-    forgot-password.tsx    Send password-reset email
-    reset-password.tsx     Deep-link landing screen for the reset email, sets new password
-    (tabs)/home.tsx        Home — net balance + friends list, real data via fetchHomeSummary
-    (tabs)/groups.tsx      Groups list, real data via fetchGroups
-    (tabs)/activity.tsx    Activity feed, real data via fetchActivity
-    group.tsx              Group detail — balances, spending charts, ledger, "more" menu (CSV export / notification settings)
-    expense.tsx            Expense detail — split breakdown, receipt items, edit history, comments
-    new-group.tsx          New group — add people by exact-email match
-    settle.tsx             Settle up — direction (owe / owed) resolved from the real pair balance
-    add-expense.tsx        Add/edit expense — ?mode=equal|exact|percent|items, ?expenseId= for editing
-    notifications.tsx      Per-group mute toggles (notification_settings table)
-```
-
-## Notes
-
-- DutchUp only **records** payments. The Easypaisa / JazzCash / bank rows on Settle up are UI placeholders: wire them to
-  `Linking.openURL(...)` / `expo-clipboard` when you add real integrations.
-- Auth (email/password signup, login, forgot/reset password) is wired to Supabase. Google sign-in is a UI placeholder
-  until an OAuth client is configured.
-- Home/Groups/Group detail/New group/Add expense/Settle up/Activity all read and write real Supabase data
-  (`src/lib/queries.ts`, balance math in `src/lib/balances.ts`). Adding people to a new group is by exact-email
-  match (`find_user_by_email` in `supabase/schema.sql` — re-run the schema after pulling this change); an unmatched
-  email is shown as "invited" for that session only, since there's no pending-invite table yet. Expenses always have
-  a single payer (the current user) — "Multiple payers" stays a UI placeholder. Screens refetch on focus; there's no
-  realtime subscription, so a change made on another device needs a re-visit to the screen to show up.
-- **Recurring expenses** are a client-side catch-up, not a real cron: opening a group checks its recurring expense
-  templates and materializes any past-due occurrences right there. This only advances when *the template's own
-  creator* opens the group — every insert (`expenses`/`expense_payers`/`expense_splits`) is RLS-gated to
-  `created_by = auth.uid()`, so no other member's client is able to generate someone else's recurring expense. If
-  you need occurrences to appear on schedule regardless of who opens the app, that needs a real `pg_cron` job or a
-  Supabase Edge Function on a schedule — not set up here.
-- **CSV export** (group detail → "…" → Export expenses) shares a CSV as plain text via the OS share sheet on
-  native (`Share.share`), or downloads a real `.csv` file on web. Native isn't a true `.csv` file attachment —
-  that needs `expo-sharing` + `expo-file-system`, both native modules that would require rebuilding the dev client.
-- **Push notifications** are settings-only: the "Notification settings" screen mutes/unmutes a group
-  (`notification_settings` table), but nothing sends an actual push. That needs `expo-notifications` (native module,
-  dev-client rebuild) plus a server-side sender — a Supabase Edge Function triggered by a Database Webhook on
-  `activity_log` inserts, checking `notification_settings` before calling Expo's push API. None of that is deployed;
-  the Activity feed is the only in-app notification surface for now.
-- **OCR receipt scanning** was traded out for **itemized splitting** (Add Expense → "Items" mode): manually add a
-  receipt's line items and assign each to whoever's splitting it — no camera, no cloud OCR (both need a native
-  module rebuild and a keyed API this environment can't provide). Itemized expenses are create-only — editing one
-  afterwards isn't supported, same scope cut as "Repeats."
-- **Currency conversion** is real: pick a currency per expense (`src/lib/currencies.ts`), and every aggregate figure
-  (Home totals, a group's hero balance/total spent/spending charts) is converted to the viewer's own
-  `profiles.default_currency` via live rates (`src/lib/exchangeRates.ts`, cached 1 hour, degrades to a 1:1 rate if
-  the API is unreachable — never hard-fails a balance screen over a third-party outage). A single expense's own
-  ledger row and detail screen always show its own original currency, unconverted — an expense's payers and splits
-  never mix currencies, so there's nothing to convert to display it correctly on its own.
-- **Spending charts** (Group detail) are plain `View`-based bars, not `react-native-svg` — simpler than real SVG for
-  flat rectangles and needs no extra dependency. Both are single-series (one accent colour; each bar is already
-  text-labeled by category or month, so color isn't carrying identity) — by category, and by month for the last 6
-  months.
-- Every screen gets real top **and** bottom safe-area padding (`Screen` in `src/components/Layout.tsx`); Stack
-  pushes and tab switches are animated (`slide_from_right` / `fade` respectively, both in the relevant `_layout.tsx`).
-- The top 52 px of each screen is reserved (or the device safe-area inset, whichever is larger), as in the design.
+3. SQL Editor → run `supabase/schema.sql` — creates every table, the profile-on-signup trigger, and RLS policies. Safe to re-run after pulling schema changes.
+4. Auth → URL Configuration → add `dutchup://reset-password` as a redirect URL.
